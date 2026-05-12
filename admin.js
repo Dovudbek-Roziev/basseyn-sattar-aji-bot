@@ -1,4 +1,4 @@
-const { getSettings, updateSetting, getAllBookings } = require("./database");
+const { getSettings, updateSetting, getAllBookings, addPhoto, clearPhotos } = require("./database");
 
 const ADMIN_ID = Number(process.env.ADMIN_ID);
 
@@ -14,18 +14,10 @@ function adminMenuKeyboard() {
       [{ text: "💰 Narxlarni o'zgartirish", callback_data: "admin_prices" }],
       [{ text: "🕒 Ish vaqtini o'zgartirish", callback_data: "admin_hours" }],
       [{ text: "📍 Manzilni o'zgartirish", callback_data: "admin_address" }],
-      [
-        {
-          text: "📞 Telefon raqamni o'zgartirish",
-          callback_data: "admin_phone",
-        },
-      ],
-      [
-        {
-          text: "📋 Band qilinganlar ro'yxati",
-          callback_data: "admin_bookings",
-        },
-      ],
+      [{ text: "📞 Telefon raqamni o'zgartirish", callback_data: "admin_phone" }],
+      [{ text: "📸 Rasm qo'shish", callback_data: "admin_add_photo" }],
+      [{ text: "🗑 Barcha rasmlarni o'chirish", callback_data: "admin_clear_photos" }],
+      [{ text: "📋 Band qilinganlar ro'yxati", callback_data: "admin_bookings" }],
     ],
   };
 }
@@ -83,6 +75,23 @@ async function handleAdminCallback(bot, query, userStates) {
   }
 
   // O'zgartirish tugmalari — foydalanuvchini kutish holatiga qo'yamiz
+  // Rasmlarni o'chirish
+  if (data === "admin_clear_photos") {
+    await clearPhotos();
+    return bot.sendMessage(chatId, "🗑 Barcha rasmlar o'chirildi!", { reply_markup: adminMenuKeyboard() });
+  }
+
+  // Rasm qo'shish
+  if (data === "admin_add_photo") {
+    userStates[userId] = { state: "admin_waiting_photo" };
+    return bot.sendMessage(chatId,
+      "📸 Rasm yuboring:\n\n" +
+      "• Bir yoki bir nechta rasm yuboring\n" +
+      "• Tugatish uchun — /admin yozing",
+      { parse_mode: "HTML" }
+    );
+  }
+
   const stateMap = {
     admin_prices: { state: "admin_waiting_prices", prompt: "💰 Yangi narxlarni kiriting:" },
     admin_hours:  { state: "admin_waiting_hours",  prompt: "🕒 Yangi ish vaqtini kiriting:" },
@@ -95,6 +104,22 @@ async function handleAdminCallback(bot, query, userStates) {
     userStates[userId] = { state: matched.state };
     bot.sendMessage(chatId, matched.prompt, { parse_mode: "HTML" });
   }
+}
+
+// Admin rasm yuborishni qayta ishlash (photo message)
+async function handleAdminPhoto(bot, msg, userStates) {
+  const userId = msg.from.id;
+  const chatId = msg.chat.id;
+  const stateInfo = userStates[userId];
+
+  if (!stateInfo || stateInfo.state !== "admin_waiting_photo") return false;
+  if (!msg.photo) return false;
+
+  // Eng katta o'lchamdagi rasmni olamiz
+  const fileId = msg.photo[msg.photo.length - 1].file_id;
+  await addPhoto(fileId);
+  bot.sendMessage(chatId, "✅ Rasm saqlandi! Yana rasm yuboring yoki /admin yozing.");
+  return true;
 }
 
 // Admin holatlarida kelgan xabarlarni qayta ishlash
@@ -159,5 +184,6 @@ module.exports = {
   isAdmin,
   handleAdminCommand,
   handleAdminCallback,
+  handleAdminPhoto,
   handleAdminState,
 };

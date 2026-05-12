@@ -2,7 +2,7 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const { connectDB, getUserLang, saveUser, getSettings, saveBooking } = require("./database");
 const { t } = require("./translations");
-const { isAdmin, handleAdminCommand, handleAdminCallback, handleAdminState } = require("./admin");
+const { isAdmin, handleAdminCommand, handleAdminCallback, handleAdminPhoto, handleAdminState } = require("./admin");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = Number(process.env.ADMIN_ID);
@@ -197,7 +197,30 @@ bot.on("callback_query", async (query) => {
   }
 
   if (data === "menu_photos") {
-    bot.sendMessage(chatId, "📸 Rasmlar tez orada qo'shiladi!", {
+    const settings = await getSettings();
+
+    if (!settings.photos || settings.photos.length === 0) {
+      bot.editMessageText("📸 Hozircha rasmlar yo'q.", {
+        chat_id: chatId,
+        message_id: msgId,
+        reply_markup: { inline_keyboard: [[{ text: t(lang, "menu").back, callback_data: "menu_back" }]] },
+      });
+      return;
+    }
+
+    // Bir rasmdan ko'p bo'lsa media group yuboramiz
+    if (settings.photos.length === 1) {
+      bot.sendPhoto(chatId, settings.photos[0]);
+    } else {
+      const mediaGroup = settings.photos.slice(0, 10).map((fileId, i) => ({
+        type: "photo",
+        media: fileId,
+        ...(i === 0 && { caption: "📸 Basseyn Sattar Aji" }),
+      }));
+      bot.sendMediaGroup(chatId, mediaGroup);
+    }
+
+    bot.sendMessage(chatId, "⬇️", {
       reply_markup: { inline_keyboard: [[{ text: t(lang, "menu").back, callback_data: "menu_back" }]] },
     });
     return;
@@ -330,6 +353,12 @@ bot.on("message", async (msg) => {
   const userId = msg.from.id;
   const chatId = msg.chat.id;
   const text = msg.text;
+
+  // ── Admin rasm yuborish ─────────────────────────────────────────────────
+  if (isAdmin(userId) && msg.photo) {
+    const handled = await handleAdminPhoto(bot, msg, userStates);
+    if (handled) return;
+  }
 
   if (!text) return;
 

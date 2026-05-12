@@ -31,6 +31,7 @@ const settingsSchema = new mongoose.Schema({
   address: { type: String, default: "" },
   mapsLink: { type: String, default: "" },
   phone: { type: String, default: "" },
+  photos: { type: [String], default: [] },
 });
 
 const Settings = mongoose.model("Settings", settingsSchema);
@@ -83,6 +84,24 @@ async function updateSetting(field, value) {
   );
 }
 
+// Rasm qo'shish
+async function addPhoto(fileId) {
+  await Settings.findOneAndUpdate(
+    { key: "main" },
+    { $push: { photos: fileId } },
+    { upsert: true }
+  );
+}
+
+// Barcha rasmlarni o'chirish
+async function clearPhotos() {
+  await Settings.findOneAndUpdate(
+    { key: "main" },
+    { photos: [] },
+    { upsert: true }
+  );
+}
+
 // Band qilishni saqlash
 async function saveBooking(data) {
   return await Booking.create(data);
@@ -102,6 +121,8 @@ module.exports = {
   saveUser,
   getSettings,
   updateSetting,
+  addPhoto,
+  clearPhotos,
   saveBooking,
   getAllBookings,
 };
