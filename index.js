@@ -377,6 +377,16 @@ bot.on("message", async (msg) => {
   }
 });
 
+// ─── Render va UptimeRobot uchun HTTP server ────────────────────────────────
+const http = require("http");
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Bot ishlayapti!");
+}).listen(PORT, () => {
+  console.log(`🌐 HTTP server ${PORT} portda ishga tushdi`);
+});
+
 // ─── MongoDB ga ulanib botni ishga tushiramiz ───────────────────────────────
 connectDB().then(() => {
   console.log("✅ Bot tayyor! Foydalanuvchilar yozishi mumkin.");
