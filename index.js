@@ -1,6 +1,6 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
-const { connectDB, getUserLang, saveUser, getSettings, saveBooking } = require("./database");
+const { connectDB, getUserLang, saveUser, getSettings, saveBooking, updateBookingStatus } = require("./database");
 const { t } = require("./translations");
 const { isAdmin, handleAdminCommand, handleAdminCallback, handleAdminPhoto, handleAdminState } = require("./admin");
 
@@ -25,6 +25,65 @@ function langKeyboard() {
         { text: "🇷🇺 Русский", callback_data: "lang_ru" },
         { text: "🇰🇬 Кыргызча", callback_data: "lang_ky" },
       ],
+    ],
+  };
+}
+
+// ─── Keyingi 7 kun klaviaturasi ─────────────────────────────────────────────
+function dateKeyboard(lang) {
+  const days = ["Yak", "Du", "Se", "Cho", "Pa", "Ju", "Sha"];
+  const dayNamesRu = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  const dayNamesKy = ["Жк", "Дш", "Шш", "Шр", "Бш", "Жм", "Иш"];
+  const dayMap = { uz: days, ru: dayNamesRu, ky: dayNamesKy };
+  const names = dayMap[lang] || days;
+
+  const buttons = [];
+  const row = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const label = `${names[d.getDay()]} ${day}.${month}`;
+    const value = `${day}.${month}.${d.getFullYear()}`;
+    row.push({ text: label, callback_data: `bdate_${value}` });
+    if (row.length === 4) { buttons.push([...row]); row.length = 0; }
+  }
+  if (row.length) buttons.push([...row]);
+  buttons.push([{ text: t(lang, "cancel"), callback_data: "booking_cancel" }]);
+  return { inline_keyboard: buttons };
+}
+
+// ─── Vaqt klaviaturasi ───────────────────────────────────────────────────────
+function timeKeyboard(lang) {
+  const times = ["08:00","09:00","10:00","11:00","12:00","13:00",
+                 "14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
+  const buttons = [];
+  for (let i = 0; i < times.length; i += 4) {
+    buttons.push(times.slice(i, i + 4).map(t => ({
+      text: t, callback_data: `btime_${t}`
+    })));
+  }
+  buttons.push([{ text: t(lang, "cancel"), callback_data: "booking_cancel" }]);
+  return { inline_keyboard: buttons };
+}
+
+// ─── Kishilar soni klaviaturasi ──────────────────────────────────────────────
+function peopleKeyboard(lang) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "1", callback_data: "bpeople_1" },
+        { text: "2", callback_data: "bpeople_2" },
+        { text: "3", callback_data: "bpeople_3" },
+        { text: "4", callback_data: "bpeople_4" },
+      ],
+      [
+        { text: "5", callback_data: "bpeople_5" },
+        { text: "6", callback_data: "bpeople_6" },
+        { text: "7+", callback_data: "bpeople_7+" },
+      ],
+      [{ text: t(lang, "cancel"), callback_data: "booking_cancel" }],
     ],
   };
 }
@@ -263,18 +322,57 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
+  // Sana tanlash
+  if (data.startsWith("bdate_")) {
+    const date = data.replace("bdate_", "");
+    userStates[userId] = { ...userStates[userId], state: "booking_time", date };
+    bot.sendMessage(chatId, t(lang, "bookingTime"), {
+      reply_markup: timeKeyboard(lang),
+    });
+    return;
+  }
+
+  // Vaqt tanlash
+  if (data.startsWith("btime_")) {
+    const time = data.replace("btime_", "");
+    userStates[userId] = { ...userStates[userId], state: "booking_people", time };
+    bot.sendMessage(chatId, t(lang, "bookingPeople"), {
+      reply_markup: peopleKeyboard(lang),
+    });
+    return;
+  }
+
+  // Kishilar soni tanlash
+  if (data.startsWith("bpeople_")) {
+    const people = data.replace("bpeople_", "");
+    const stateInfo = userStates[userId];
+    userStates[userId] = { ...stateInfo, state: "booking_final", people };
+
+    const confirmText = t(lang, "bookingConfirm",
+      stateInfo.name, stateInfo.phone, stateInfo.date, stateInfo.time, people
+    );
+    bot.sendMessage(chatId, confirmText, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: t(lang, "confirmYes"), callback_data: "booking_confirm" },
+            { text: t(lang, "confirmNo"),  callback_data: "booking_deny" },
+          ],
+        ],
+      },
+    });
+    return;
+  }
+
   if (data === "booking_cancel") {
     delete userStates[userId];
     const name = query.from.first_name || "Mehmon";
-    bot.editMessageText(t(lang, "bookingCancel"), {
-      chat_id: chatId,
-      message_id: msgId,
-    });
-    // Menyuni qayta ko'rsatamiz
+    bot.sendMessage(chatId, t(lang, "bookingCancel"));
     setTimeout(() => {
       bot.sendMessage(chatId, t(lang, "welcome", name), {
         parse_mode: "HTML",
-        reply_markup: mainMenuKeyboard(lang),
+        reply_markup: mainMenuKeyboard(lang, isAdmin(userId)),
       });
     }, 500);
     return;
@@ -286,23 +384,33 @@ bot.on("callback_query", async (query) => {
     if (!stateInfo || !stateInfo.name || !stateInfo.phone) return;
 
     // Bazaga saqlaymiz
-    await saveBooking({
+    const booking = await saveBooking({
       userId,
       username: query.from.username || "",
       firstName: query.from.first_name || "",
       name: stateInfo.name,
       phone: stateInfo.phone,
+      date: stateInfo.date || "",
+      time: stateInfo.time || "",
+      people: stateInfo.people || "",
       language: lang,
     });
 
-    // Adminga xabar yuboramiz
-    const adminText = t(lang, "adminBookingNotify",
-      stateInfo.name,
-      stateInfo.phone,
-      query.from.username,
-      userId
+    // Adminga Qabul/Rad tugmalari bilan xabar yuboramiz
+    const adminText = t("uz", "adminBookingNotify",
+      stateInfo.name, stateInfo.phone,
+      stateInfo.date, stateInfo.time, stateInfo.people,
+      query.from.username, userId
     );
-    bot.sendMessage(ADMIN_ID, adminText, { parse_mode: "HTML" });
+    bot.sendMessage(ADMIN_ID, adminText, {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Qabul qilish", callback_data: `accept_${booking._id}` },
+          { text: "❌ Rad etish",    callback_data: `reject_${booking._id}` },
+        ]],
+      },
+    });
 
     delete userStates[userId];
 
@@ -311,15 +419,6 @@ bot.on("callback_query", async (query) => {
       message_id: msgId,
       parse_mode: "HTML",
     });
-
-    // Menyuni qayta ko'rsatamiz
-    const name = query.from.first_name || "Mehmon";
-    setTimeout(() => {
-      bot.sendMessage(chatId, t(lang, "welcome", name), {
-        parse_mode: "HTML",
-        reply_markup: mainMenuKeyboard(lang),
-      });
-    }, 1000);
     return;
   }
 
@@ -329,6 +428,32 @@ bot.on("callback_query", async (query) => {
       chat_id: chatId,
       message_id: msgId,
     });
+    return;
+  }
+
+  // ── Admin: Qabul / Rad etish ──────────────────────────────────────────────
+  if (data.startsWith("accept_") || data.startsWith("reject_")) {
+    if (!isAdmin(userId)) return;
+    const isAccept = data.startsWith("accept_");
+    const bookingId = data.replace(isAccept ? "accept_" : "reject_", "");
+
+    const booking = await updateBookingStatus(bookingId, isAccept ? "accepted" : "rejected");
+
+    // Foydalanuvchiga xabar
+    if (booking) {
+      const userLang = booking.language || "uz";
+      const userMsg = isAccept
+        ? t(userLang, "bookingAccepted", booking.date, booking.time)
+        : t(userLang, "bookingRejected");
+      bot.sendMessage(booking.userId, userMsg, { parse_mode: "HTML" });
+    }
+
+    // Admin xabarini yangilaymiz
+    bot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+      chat_id: chatId,
+      message_id: msgId,
+    });
+    bot.sendMessage(chatId, isAccept ? "✅ Qabul qilindi! Foydalanuvchiga xabar yuborildi." : "❌ Rad etildi! Foydalanuvchiga xabar yuborildi.");
     return;
   }
 
@@ -386,21 +511,11 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // Telefon kutilmoqda
+  // Telefon kutilmoqda → sana tanlashga o'tamiz
   if (stateInfo.state === "booking_phone") {
-    userStates[userId] = { ...stateInfo, state: "booking_confirm", phone: text };
-
-    const confirmText = t(lang, "bookingConfirm", stateInfo.name, text);
-    bot.sendMessage(chatId, confirmText, {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: t(lang, "confirmYes"), callback_data: "booking_confirm" },
-            { text: t(lang, "confirmNo"),  callback_data: "booking_deny" },
-          ],
-        ],
-      },
+    userStates[userId] = { ...stateInfo, state: "booking_date", phone: text };
+    bot.sendMessage(chatId, t(lang, "bookingDate"), {
+      reply_markup: dateKeyboard(lang),
     });
     return;
   }

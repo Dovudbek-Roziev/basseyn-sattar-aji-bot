@@ -47,17 +47,25 @@ const translations = {
     // Joy band qilish
     bookingStart: "🏊 Joy band qilish uchun ismingizni kiriting:",
     bookingPhone: "📞 Telefon raqamingizni kiriting:",
-    bookingConfirm: (name, phone) =>
-      `✅ <b>Ma'lumotlaringiz:</b>\n\n👤 Ism: ${name}\n📞 Telefon: ${phone}\n\nYuborilsinmi?`,
-    bookingSuccess:
-      "✅ So'rovingiz qabul qilindi! Tez orada siz bilan bog'lanamiz.",
+    bookingDate: "📅 Qaysi kuni kelasiz? Sanani tanlang:",
+    bookingTime: "🕐 Qaysi vaqtda kelasiz? Vaqtni tanlang:",
+    bookingPeople: "👥 Nechi kishi kelasiz?",
+    bookingConfirm: (name, phone, date, time, people) =>
+      `✅ <b>Ma'lumotlaringiz:</b>\n\n👤 Ism: ${name}\n📞 Telefon: ${phone}\n📅 Sana: ${date}\n🕐 Vaqt: ${time}\n👥 Kishilar: ${people}\n\nYuborilsinmi?`,
+    bookingSuccess: "✅ So'rovingiz yuborildi! Admin tasdiqlagach xabar beramiz.",
+    bookingAccepted: (date, time) => `✅ <b>Band qilinishingiz tasdiqlandi!</b>\n\n📅 ${date} kuni 🕐 ${time} da kutamiz!\n\n🏊 Basseyn Sattar Aji`,
+    bookingRejected: "❌ <b>Afsuski, so'rovingiz rad etildi.</b>\n\nIltimos, boshqa vaqt tanlang yoki biz bilan bog'laning.",
     bookingCancel: "❌ Bekor qilindi.",
     confirmYes: "✅ Ha, yuborish",
     confirmNo: "❌ Bekor qilish",
 
-    // Admin xabari (joy band qilinganda)
-    adminBookingNotify: (name, phone, username, userId) =>
-      `🔔 <b>Yangi band qilish!</b>\n\n👤 Ism: ${name}\n📞 Telefon: ${phone}\n🆔 Telegram: @${username || "yo'q"}\n🔢 User ID: ${userId}`,
+    // Admin xabari
+    adminBookingNotify: (name, phone, date, time, people, username, userId) =>
+      `🔔 <b>Yangi band qilish!</b>\n\n👤 Ism: ${name}\n📞 Telefon: ${phone}\n📅 Sana: ${date}\n🕐 Vaqt: ${time}\n👥 Kishilar: ${people}\n🆔 Telegram: @${username || "yo'q"}\n🔢 User ID: ${userId}`,
+    adminAccept: "✅ Qabul qilish",
+    adminReject: "❌ Rad etish",
+    adminAccepted: "✅ Tasdiqlandi! Foydalanuvchiga xabar yuborildi.",
+    adminRejected: "❌ Rad etildi! Foydalanuvchiga xabar yuborildi.",
 
     // Xato xabar
     error: "Xatolik yuz berdi. Qaytadan urinib ko'ring.",
@@ -101,16 +109,24 @@ const translations = {
 
     bookingStart: "🏊 Для бронирования введите ваше имя:",
     bookingPhone: "📞 Введите ваш номер телефона:",
-    bookingConfirm: (name, phone) =>
-      `✅ <b>Ваши данные:</b>\n\n👤 Имя: ${name}\n📞 Телефон: ${phone}\n\nОтправить?`,
-    bookingSuccess:
-      "✅ Ваша заявка принята! Мы свяжемся с вами в ближайшее время.",
+    bookingDate: "📅 В какой день придёте? Выберите дату:",
+    bookingTime: "🕐 В какое время придёте? Выберите время:",
+    bookingPeople: "👥 Сколько человек придёт?",
+    bookingConfirm: (name, phone, date, time, people) =>
+      `✅ <b>Ваши данные:</b>\n\n👤 Имя: ${name}\n📞 Телефон: ${phone}\n📅 Дата: ${date}\n🕐 Время: ${time}\n👥 Количество: ${people}\n\nОтправить?`,
+    bookingSuccess: "✅ Заявка отправлена! Уведомим вас после подтверждения.",
+    bookingAccepted: (date, time) => `✅ <b>Ваше бронирование подтверждено!</b>\n\n📅 Ждём вас ${date} в 🕐 ${time}!\n\n🏊 Басейн Саттар Ажи`,
+    bookingRejected: "❌ <b>К сожалению, ваша заявка отклонена.</b>\n\nПожалуйста, выберите другое время или свяжитесь с нами.",
     bookingCancel: "❌ Отменено.",
     confirmYes: "✅ Да, отправить",
     confirmNo: "❌ Отменить",
 
-    adminBookingNotify: (name, phone, username, userId) =>
-      `🔔 <b>Новое бронирование!</b>\n\n👤 Имя: ${name}\n📞 Телефон: ${phone}\n🆔 Telegram: @${username || "нет"}\n🔢 User ID: ${userId}`,
+    adminBookingNotify: (name, phone, date, time, people, username, userId) =>
+      `🔔 <b>Новое бронирование!</b>\n\n👤 Имя: ${name}\n📞 Телефон: ${phone}\n📅 Дата: ${date}\n🕐 Время: ${time}\n👥 Количество: ${people}\n🆔 Telegram: @${username || "нет"}\n🔢 User ID: ${userId}`,
+    adminAccept: "✅ Подтвердить",
+    adminReject: "❌ Отклонить",
+    adminAccepted: "✅ Подтверждено! Пользователь уведомлён.",
+    adminRejected: "❌ Отклонено! Пользователь уведомлён.",
 
     error: "Произошла ошибка. Попробуйте ещё раз.",
     cancel: "❌ Отменить",
@@ -153,16 +169,24 @@ const translations = {
 
     bookingStart: "🏊 Орун брондоо үчүн атыңызды жазыңыз:",
     bookingPhone: "📞 Телефон номериңизди жазыңыз:",
-    bookingConfirm: (name, phone) =>
-      `✅ <b>Маалыматтарыңыз:</b>\n\n👤 Аты: ${name}\n📞 Телефон: ${phone}\n\nЖөнөтүлсүнбү?`,
-    bookingSuccess:
-      "✅ Суроо-талабыңыз кабыл алынды! Жакында биз сиз менен байланышабыз.",
+    bookingDate: "📅 Кайсы күнү келесиз? Күндү тандаңыз:",
+    bookingTime: "🕐 Кайсы убакта келесиз? Убакытты тандаңыз:",
+    bookingPeople: "👥 Нече киши келесиз?",
+    bookingConfirm: (name, phone, date, time, people) =>
+      `✅ <b>Маалыматтарыңыз:</b>\n\n👤 Аты: ${name}\n📞 Телефон: ${phone}\n📅 Күн: ${date}\n🕐 Убакыт: ${time}\n👥 Адамдар: ${people}\n\nЖөнөтүлсүнбү?`,
+    bookingSuccess: "✅ Суроо-талабыңыз жөнөтүлдү! Тастыктагандан кийин кабарлайбыз.",
+    bookingAccepted: (date, time) => `✅ <b>Броноңуз тастыкталды!</b>\n\n📅 ${date} күнү 🕐 ${time} да күтөбүз!\n\n🏊 Бассейн Саттар Ажи`,
+    bookingRejected: "❌ <b>Кечиресиз, суроо-талабыңыз четке кагылды.</b>\n\nБашка убакытты тандаңыз же биз менен байланышыңыз.",
     bookingCancel: "❌ Жокко чыгарылды.",
     confirmYes: "✅ Ооба, жөнөтүү",
     confirmNo: "❌ Жокко чыгаруу",
 
-    adminBookingNotify: (name, phone, username, userId) =>
-      `🔔 <b>Жаңы брондоо!</b>\n\n👤 Аты: ${name}\n📞 Телефон: ${phone}\n🆔 Telegram: @${username || "жок"}\n🔢 User ID: ${userId}`,
+    adminBookingNotify: (name, phone, date, time, people, username, userId) =>
+      `🔔 <b>Жаңы брондоо!</b>\n\n👤 Аты: ${name}\n📞 Телефон: ${phone}\n📅 Күн: ${date}\n🕐 Убакыт: ${time}\n👥 Адамдар: ${people}\n🆔 Telegram: @${username || "жок"}\n🔢 User ID: ${userId}`,
+    adminAccept: "✅ Тастыктоо",
+    adminReject: "❌ Четке кагуу",
+    adminAccepted: "✅ Тастыкталды! Колдонуучуга кабар жөнөтүлдү.",
+    adminRejected: "❌ Четке кагылды! Колдонуучуга кабар жөнөтүлдү.",
 
     error: "Ката кетти. Кайра аракет кылыңыз.",
     cancel: "❌ Жокко чыгаруу",

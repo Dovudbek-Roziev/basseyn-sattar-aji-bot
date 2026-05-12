@@ -43,7 +43,11 @@ const bookingSchema = new mongoose.Schema({
   firstName: { type: String, default: "" },
   name: { type: String, required: true },
   phone: { type: String, required: true },
+  date: { type: String, default: "" },
+  time: { type: String, default: "" },
+  people: { type: String, default: "" },
   language: { type: String, default: "uz" },
+  status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -107,6 +111,11 @@ async function saveBooking(data) {
   return await Booking.create(data);
 }
 
+// Band qilish holatini yangilash
+async function updateBookingStatus(bookingId, status) {
+  return await Booking.findByIdAndUpdate(bookingId, { status }, { new: true });
+}
+
 // Barcha band qilishlarni olish
 async function getAllBookings() {
   return await Booking.find().sort({ createdAt: -1 }).limit(50);
@@ -124,5 +133,6 @@ module.exports = {
   addPhoto,
   clearPhotos,
   saveBooking,
+  updateBookingStatus,
   getAllBookings,
 };
