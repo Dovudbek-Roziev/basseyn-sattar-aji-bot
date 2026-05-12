@@ -2,27 +2,27 @@ const { getSettings, updateSetting, getAllBookings, addPhoto, clearPhotos } = re
 
 const ADMIN_ID = Number(process.env.ADMIN_ID);
 
-// Admin ekanligini tekshirish
 function isAdmin(userId) {
   return userId === ADMIN_ID;
 }
 
-// Admin panel asosiy menyu
+// ─── Admin panel klaviaturasi ───────────────────────────────────────────────
 function adminMenuKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: "💰 Narxlarni o'zgartirish", callback_data: "admin_prices" }],
-      [{ text: "🕒 Ish vaqtini o'zgartirish", callback_data: "admin_hours" }],
-      [{ text: "📍 Manzilni o'zgartirish", callback_data: "admin_address" }],
-      [{ text: "📞 Telefon raqamni o'zgartirish", callback_data: "admin_phone" }],
-      [{ text: "📸 Rasm qo'shish", callback_data: "admin_add_photo" }],
-      [{ text: "🗑 Barcha rasmlarni o'chirish", callback_data: "admin_clear_photos" }],
-      [{ text: "📋 Band qilinganlar ro'yxati", callback_data: "admin_bookings" }],
+      [{ text: "💰 Narxlarni o'zgartirish",      callback_data: "admin_prices" }],
+      [{ text: "🕒 Ish vaqtini o'zgartirish",     callback_data: "admin_hours" }],
+      [{ text: "📍 Manzilni o'zgartirish",         callback_data: "admin_address" }],
+      [{ text: "📞 Telefon raqamni o'zgartirish",  callback_data: "admin_phone" }],
+      [{ text: "📸 Rasm qo'shish",                 callback_data: "admin_add_photo" }],
+      [{ text: "🗑 Barcha rasmlarni o'chirish",    callback_data: "admin_clear_photos" }],
+      [{ text: "📋 Band qilinganlar ro'yxati",     callback_data: "admin_bookings" }],
+      [{ text: "🏠 Bosh sahifaga",                 callback_data: "admin_home" }],
     ],
   };
 }
 
-// /admin buyrug'i
+// ─── /admin buyrug'i ────────────────────────────────────────────────────────
 async function handleAdminCommand(bot, msg) {
   const userId = msg.from.id;
 
@@ -31,13 +31,18 @@ async function handleAdminCommand(bot, msg) {
   }
 
   const settings = await getSettings();
+  const photoCount = settings.photos ? settings.photos.length : 0;
 
   const text =
-    `🔧 <b>Admin Panel — Basseyn Sattar Aji</b>\n\n` +
-    `💰 Narxlar: ${settings.prices || "<i>kiritilmagan</i>"}\n` +
-    `🕒 Ish vaqti: ${settings.workingHours || "<i>kiritilmagan</i>"}\n` +
-    `📍 Manzil: ${settings.address || "<i>kiritilmagan</i>"}\n` +
-    `📞 Telefon: ${settings.phone || "<i>kiritilmagan</i>"}`;
+    `🔧 <b>Admin Panel — Basseyn Sattar Aji</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 Narxlar: ${settings.prices ? "✅ kiritilgan" : "❌ kiritilmagan"}\n` +
+    `🕒 Ish vaqti: ${settings.workingHours ? "✅ kiritilgan" : "❌ kiritilmagan"}\n` +
+    `📍 Manzil: ${settings.address ? "✅ kiritilgan" : "❌ kiritilmagan"}\n` +
+    `📞 Telefon: ${settings.phone ? "✅ kiritilgan" : "❌ kiritilmagan"}\n` +
+    `📸 Rasmlar: ${photoCount > 0 ? `✅ ${photoCount} ta` : "❌ yo'q"}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `Quyidagi bo'limlardan birini tanlang:`;
 
   bot.sendMessage(msg.chat.id, text, {
     parse_mode: "HTML",
@@ -45,58 +50,90 @@ async function handleAdminCommand(bot, msg) {
   });
 }
 
-// Admin callback'larini qayta ishlash
-// userStates — index.js dan keladi (band qilish holatlari bilan birgalikda ishlatiladi)
-async function handleAdminCallback(bot, query, userStates) {
+// ─── Admin callback'larini qayta ishlash ────────────────────────────────────
+async function handleAdminCallback(bot, query, userStates, showMainMenu) {
   const userId = query.from.id;
   const chatId = query.message.chat.id;
+  const msgId = query.message.message_id;
   const data = query.data;
 
   if (!isAdmin(userId)) return;
 
   bot.answerCallbackQuery(query.id);
 
+  // Bosh sahifaga qaytish
+  if (data === "admin_home") {
+    if (typeof showMainMenu === "function") {
+      showMainMenu(bot, query);
+    }
+    return;
+  }
+
   // Band qilinganlar ro'yxati
   if (data === "admin_bookings") {
     const bookings = await getAllBookings();
 
     if (bookings.length === 0) {
-      return bot.sendMessage(chatId, "📋 Hozircha band qilinganlar yo'q.");
+      return bot.sendMessage(chatId,
+        "📋 <b>Band qilinganlar ro'yxati</b>\n\n" +
+        "Hozircha band qilinganlar yo'q.",
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: "🔙 Admin panelga", callback_data: "open_admin" }]] },
+        }
+      );
     }
 
-    // Har 10 tasini alohida xabar qilib yuboramiz (Telegram limit)
-    let text = "📋 <b>Band qilinganlar ro'yxati:</b>\n\n";
+    let text = `📋 <b>Band qilinganlar ro'yxati</b> (${bookings.length} ta)\n━━━━━━━━━━━━━━━━━━━━\n\n`;
     bookings.forEach((b, i) => {
-      const date = new Date(b.createdAt).toLocaleString("uz-UZ");
-      text += `${i + 1}. 👤 ${b.name} | 📞 ${b.phone} | @${b.username || "yo'q"} | 🕐 ${date}\n`;
+      const statusIcon = b.status === "accepted" ? "✅" : b.status === "rejected" ? "❌" : "⏳";
+      const date = new Date(b.createdAt).toLocaleDateString("uz-UZ");
+      text +=
+        `${i + 1}. ${statusIcon} <b>${b.name}</b>\n` +
+        `   📞 ${b.phone}\n` +
+        `   📅 ${b.date || "—"} 🕐 ${b.time || "—"} 👥 ${b.people || "—"}\n` +
+        `   🆔 @${b.username || "yo'q"} | ${date}\n\n`;
+
+      // Telegram 4096 belgi chegarasi
+      if (text.length > 3500) {
+        text += `... va boshqalar`;
+        return;
+      }
     });
 
-    return bot.sendMessage(chatId, text, { parse_mode: "HTML" });
+    return bot.sendMessage(chatId, text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "🔙 Admin panelga", callback_data: "open_admin" }]] },
+    });
   }
 
-  // O'zgartirish tugmalari — foydalanuvchini kutish holatiga qo'yamiz
   // Rasmlarni o'chirish
   if (data === "admin_clear_photos") {
     await clearPhotos();
-    return bot.sendMessage(chatId, "🗑 Barcha rasmlar o'chirildi!", { reply_markup: adminMenuKeyboard() });
+    return bot.sendMessage(chatId,
+      "🗑 <b>Barcha rasmlar o'chirildi!</b>",
+      { parse_mode: "HTML", reply_markup: adminMenuKeyboard() }
+    );
   }
 
   // Rasm qo'shish
   if (data === "admin_add_photo") {
     userStates[userId] = { state: "admin_waiting_photo" };
     return bot.sendMessage(chatId,
-      "📸 Rasm yuboring:\n\n" +
+      "📸 <b>Rasm yuborish rejimi</b>\n\n" +
       "• Bir yoki bir nechta rasm yuboring\n" +
-      "• Tugatish uchun — /admin yozing",
+      "• Har bir rasm avtomatik saqlanadi\n" +
+      "• Tugatish uchun /admin yozing",
       { parse_mode: "HTML" }
     );
   }
 
+  // O'zgartirish tugmalari
   const stateMap = {
-    admin_prices: { state: "admin_waiting_prices", prompt: "💰 Yangi narxlarni kiriting:" },
-    admin_hours:  { state: "admin_waiting_hours",  prompt: "🕒 Yangi ish vaqtini kiriting:" },
-    admin_address:{ state: "admin_waiting_address", prompt: "📍 Yangi manzilni kiriting:\n\n📌 Google Maps linkini ham kiritishni unutmang (keyingi xabarda so'raymiz)" },
-    admin_phone:  { state: "admin_waiting_phone",   prompt: "📞 Yangi telefon raqamni kiriting:" },
+    admin_prices:  { state: "admin_waiting_prices",  prompt: "💰 <b>Narxlarni o'zgartirish</b>\n\nYangi narxlarni kiriting:" },
+    admin_hours:   { state: "admin_waiting_hours",   prompt: "🕒 <b>Ish vaqtini o'zgartirish</b>\n\nYangi ish vaqtini kiriting:" },
+    admin_address: { state: "admin_waiting_address", prompt: "📍 <b>Manzilni o'zgartirish</b>\n\nYangi manzilni kiriting:" },
+    admin_phone:   { state: "admin_waiting_phone",   prompt: "📞 <b>Telefon raqamni o'zgartirish</b>\n\nYangi telefon raqamni kiriting:" },
   };
 
   const matched = stateMap[data];
@@ -106,7 +143,7 @@ async function handleAdminCallback(bot, query, userStates) {
   }
 }
 
-// Admin rasm yuborishni qayta ishlash (photo message)
+// ─── Admin rasm yuborishni qayta ishlash ────────────────────────────────────
 async function handleAdminPhoto(bot, msg, userStates) {
   const userId = msg.from.id;
   const chatId = msg.chat.id;
@@ -115,47 +152,44 @@ async function handleAdminPhoto(bot, msg, userStates) {
   if (!stateInfo || stateInfo.state !== "admin_waiting_photo") return false;
   if (!msg.photo) return false;
 
-  // Eng katta o'lchamdagi rasmni olamiz
   const fileId = msg.photo[msg.photo.length - 1].file_id;
   await addPhoto(fileId);
-  bot.sendMessage(chatId, "✅ Rasm saqlandi! Yana rasm yuboring yoki /admin yozing.");
+  bot.sendMessage(chatId,
+    "✅ Rasm saqlandi!\n\nYana rasm yuboring yoki /admin yozing."
+  );
   return true;
 }
 
-// Admin holatlarida kelgan xabarlarni qayta ishlash
+// ─── Admin holatlarida kelgan xabarlarni qayta ishlash ──────────────────────
 async function handleAdminState(bot, msg, userStates) {
   const userId = msg.from.id;
   const chatId = msg.chat.id;
   const text = msg.text;
   const stateInfo = userStates[userId];
 
-  if (!stateInfo) return false; // Admin holati yo'q
+  if (!stateInfo) return false;
 
   switch (stateInfo.state) {
     case "admin_waiting_prices":
       await updateSetting("prices", text);
       delete userStates[userId];
-      bot.sendMessage(chatId, "✅ Narxlar yangilandi!", { reply_markup: adminMenuKeyboard() });
+      bot.sendMessage(chatId, "✅ <b>Narxlar yangilandi!</b>", { parse_mode: "HTML", reply_markup: adminMenuKeyboard() });
       return true;
 
     case "admin_waiting_hours":
       await updateSetting("workingHours", text);
       delete userStates[userId];
-      bot.sendMessage(chatId, "✅ Ish vaqti yangilandi!", { reply_markup: adminMenuKeyboard() });
+      bot.sendMessage(chatId, "✅ <b>Ish vaqti yangilandi!</b>", { parse_mode: "HTML", reply_markup: adminMenuKeyboard() });
       return true;
 
     case "admin_waiting_address":
-      // Avval manzilni saqlaymiz, keyin maps link so'raymiz
       userStates[userId] = { state: "admin_waiting_maps", address: text };
       bot.sendMessage(chatId,
-        `📌 Endi Google Maps linkini kiriting:\n\n` +
-        `<b>🇺🇿 O'zbek:</b>\n` +
-        `Google Maps ni oching → Basseynni toping → "Ulashish" tugmasini bosing → "Havolani nusxalash" ni tanlang → shu linkni yuboring\n\n` +
-        `<b>🇷🇺 Русский:</b>\n` +
-        `Откройте Google Maps → Найдите бассейн → Нажмите "Поделиться" → "Копировать ссылку" → отправьте эту ссылку\n\n` +
-        `<b>🇰🇬 Кыргызча:</b>\n` +
-        `Google Maps ачыңыз → Бассейнди табыңыз → "Бөлүшүү" баскычын басыңыз → "Шилтемени көчүрүү" → ошол шилтемени жөнөтүңүз\n\n` +
-        `❌ Link yo'q bo'lsa — <b>yo'q</b> deb yozing`,
+        `📌 <b>Google Maps linkini kiriting:</b>\n\n` +
+        `<b>🇺🇿</b> Google Maps → Basseynni toping → "Ulashish" → "Havolani nusxalash"\n\n` +
+        `<b>🇷🇺</b> Google Maps → Найдите бассейн → "Поделиться" → "Копировать ссылку"\n\n` +
+        `<b>🇰🇬</b> Google Maps → Бассейнди табыңыз → "Бөлүшүү" → "Шилтемени көчүрүү"\n\n` +
+        `Link yo'q bo'lsa — <b>yo'q</b> deb yozing`,
         { parse_mode: "HTML" }
       );
       return true;
@@ -166,13 +200,13 @@ async function handleAdminState(bot, msg, userStates) {
         await updateSetting("mapsLink", text);
       }
       delete userStates[userId];
-      bot.sendMessage(chatId, "✅ Manzil yangilandi!", { reply_markup: adminMenuKeyboard() });
+      bot.sendMessage(chatId, "✅ <b>Manzil yangilandi!</b>", { parse_mode: "HTML", reply_markup: adminMenuKeyboard() });
       return true;
 
     case "admin_waiting_phone":
       await updateSetting("phone", text);
       delete userStates[userId];
-      bot.sendMessage(chatId, "✅ Telefon raqam yangilandi!", { reply_markup: adminMenuKeyboard() });
+      bot.sendMessage(chatId, "✅ <b>Telefon raqam yangilandi!</b>", { parse_mode: "HTML", reply_markup: adminMenuKeyboard() });
       return true;
 
     default:

@@ -175,7 +175,14 @@ bot.on("callback_query", async (query) => {
 
   // ── Admin callback'lari ───────────────────────────────────────────────────
   if (data.startsWith("admin_")) {
-    await handleAdminCallback(bot, query, userStates);
+    await handleAdminCallback(bot, query, userStates, async (bot, query) => {
+      const lang = await getUserLang(query.from.id) || "uz";
+      const name = query.from.first_name || "Mehmon";
+      bot.sendMessage(query.message.chat.id, t(lang, "welcome", name), {
+        parse_mode: "HTML",
+        reply_markup: mainMenuKeyboard(lang, true),
+      });
+    });
     return;
   }
 
